@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import type { LoaderFunctionArgs } from "react-router";
 import { redirect } from "react-router";
 import { authenticate } from "../../../shopify.server";

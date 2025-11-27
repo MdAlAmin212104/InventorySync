@@ -1,11 +1,14 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import type {
   ActionFunctionArgs,
   HeadersFunction,
   LoaderFunctionArgs,
 } from "react-router";
-import { redirect, useFetcher, useLoaderData } from "react-router";
+import { redirect, } from "react-router";
 import { authenticate } from "../shopify.server";
 import { boundary } from "@shopify/shopify-app-react-router/server";
+import ProductPicker from "app/components/ProductPicker";
+
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { session } = await authenticate.admin(request);
@@ -39,21 +42,31 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   return redirect(authUrl.toString());
 };
 
+declare global {
+  interface Window {
+    shopify: {
+      resourcePicker: (options: {
+        type: string;
+        multiple?: boolean;
+        action?: string;
+      }) => Promise<any>;
+    };
+  }
+}
 
 export default function Index() {
-   const { shop } = useLoaderData();
-  const fetcher = useFetcher();
+  //  const { shop } = useLoaderData();
+  // const fetcher = useFetcher();
 
-  const handleGoogleConnect = () => {
-  fetcher.submit({ shop }, { method: "post" }); // ✅ Post to same route
-};
-
+  // const handleGoogleConnect = () => {
+  //   fetcher.submit({ shop }, { method: "post" }); // ✅ Post to same route
+  // };
   
   return (
     <s-page heading="Shopify app template">
-      <s-button slot="primary-action" onClick={handleGoogleConnect}>
+      {/* <s-button slot="primary-action" onClick={handleGoogleConnect}>
         Connect Google Sheet
-      </s-button>
+      </s-button> */}
 
       <s-section heading="Congrats on creating a new Shopify app 🎉">
         <s-paragraph>
@@ -143,7 +156,13 @@ export default function Index() {
               GraphiQL
             </s-link>
           </s-list-item>
+          
         </s-unordered-list>
+        
+      </s-section>
+      <s-section>
+        <s-paragraph> product select opion here</s-paragraph>
+        <ProductPicker/>
       </s-section>
     </s-page>
   );
