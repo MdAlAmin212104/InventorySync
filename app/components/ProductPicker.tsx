@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
-import {useAppBridge} from "@shopify/app-bridge-react";
+import {Modal, TitleBar, useAppBridge} from "@shopify/app-bridge-react";
 
 
 export default function ProductPicker() {
@@ -26,9 +26,33 @@ export default function ProductPicker() {
     }
   };
 
+  const notification = () => {
+    shopify.toast.show('Message sent', {duration: 1000});
+  };
+
+
+  const model = () => {
+    console.log("Model");
+    shopify.modal.show('my-modal');
+
+  };
+
   return (
-    <s-button onClick={selectProduct}>
+    <div style={{gap: "1rem", display: "flex"}}>
+      <s-button onClick={selectProduct}>
       Select products
     </s-button>
+    <s-button onClick={notification}>Notifications</s-button>
+    <s-button onClick={model}>Model</s-button>
+    <Modal id="my-modal">
+      <p style={{padding: "15px"}}>Message</p>
+      <TitleBar title="Title">
+        <button variant="primary">Label</button>
+        <button onClick={() => shopify.modal.hide('my-modal')}>Close</button>
+      </TitleBar>
+    </Modal>
+
+    </div>
+    
   );
 }

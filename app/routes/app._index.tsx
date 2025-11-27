@@ -42,18 +42,6 @@ export const action = async ({ request }: ActionFunctionArgs) => {
   return redirect(authUrl.toString());
 };
 
-declare global {
-  interface Window {
-    shopify: {
-      resourcePicker: (options: {
-        type: string;
-        multiple?: boolean;
-        action?: string;
-      }) => Promise<any>;
-    };
-  }
-}
-
 export default function Index() {
   //  const { shop } = useLoaderData();
   // const fetcher = useFetcher();
@@ -163,6 +151,8 @@ export default function Index() {
       <s-section>
         <s-paragraph> product select opion here</s-paragraph>
         <ProductPicker/>
+
+        
       </s-section>
     </s-page>
   );
