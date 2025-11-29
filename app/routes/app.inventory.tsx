@@ -7,17 +7,27 @@ import type {
 import { useFetcher, useLoaderData } from "react-router";
 import { authenticate } from "../shopify.server";
 import { boundary } from "@shopify/shopify-app-react-router/server";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { admin, session } = await authenticate.admin(request);
 
   const response = await admin.graphql(`
     query GetProducts {
-      products(first: 50,  sortKey: CREATED_AT, reverse: true) {
+      products(first: 50, sortKey: CREATED_AT, reverse: true) {
         nodes {
           id
           title
+          media(first:1){
+            nodes{
+              preview{
+                image{
+                  url
+                  altText
+                }
+              }
+            }
+          }
           variants(first: 50) {
             nodes {
               id
@@ -46,16 +56,15 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 
   const data = await response.json();
 
-  return ({
+  return {
     shop: session.shop,
     products: data.data?.products?.nodes || [],
-  });
+  };
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
   const { admin, session } = await authenticate.admin(request);
   console.log(admin, session);
-  // Future actions here
   return null;
 };
 
@@ -63,11 +72,10 @@ export default function Index() {
   const { products } = useLoaderData<typeof loader>();
   const [productDetails, setProductDetails] = useState<any[]>(products);
   const [loading, setLoading] = useState(false);
-  const [error,] = useState<string | null>(null);
+  const [error] = useState<string | null>(null);
+  const [openProducts, setOpenProducts] = useState<{ [key: string]: boolean }>({});
   const fetcher = useFetcher();
 
-
-  // Update products when fetcher data changes
   useEffect(() => {
     if (fetcher.data?.products) {
       setProductDetails(fetcher.data.products);
@@ -75,23 +83,48 @@ export default function Index() {
     }
   }, [fetcher.data]);
 
+  useEffect(() => {
+    const style = document.createElement('style');
+    style.innerHTML = `
+      s-clickable:hover,
+      s-clickable:hover::part(base) {
+        background-color: transparent !important;
+        background: transparent !important;
+      }
+    `;
+    document.head.appendChild(style);
+
+    return () => {
+      document.head.removeChild(style);
+    };
+  }, []);
+
+  const toggleProduct = useCallback((productId: string) => {
+    setOpenProducts((prev) => ({
+      ...prev,
+      [productId]: !prev[productId],
+    }));
+  }, []);
+
+  // Calculate total inventory for a product
+  const getTotalInventory = (product: any) => {
+    return product.variants.nodes.reduce((total: number, variant: any) => {
+      return total + (variant.inventoryQuantity || 0);
+    }, 0);
+  };
+
+  // Get product image URL safely
+  const getProductImage = (product: any) => {
+    return product?.media?.nodes?.[0]?.preview?.image?.url || null;
+  };
+
+  // Get product image alt text safely
+  const getProductImageAlt = (product: any) => {
+    return product?.media?.nodes?.[0]?.preview?.image?.altText || product.title;
+  };
+
   return (
     <s-page heading="Shopify Product Inventory">
-      <s-section>
-        <h1 className="text-2xl font-bold text-blue-600">Hello Shopify + Tailwind!</h1>
-      <button className="mt-4 px-4 py-2 bg-black text-white rounded-lg">
-        Click Me
-      </button>
-      <div className="shadow-xl p-4 bg-white rounded-xl">
-  <p className="text-lg font-semibold text-gray-700">Dashboard</p>
-</div>
-
-        <s-box padding="base">Available for iPad, iPhone, and Android.</s-box>
-
-        <s-box padding="base" background="subdued" border="base" borderRadius="base">
-          Available for iPad, iPhone, and Android.
-        </s-box>
-      </s-section>
       <s-section>
         <div style={{
           display: 'flex',
@@ -99,7 +132,12 @@ export default function Index() {
           alignItems: 'center',
           marginBottom: '20px'
         }}>
-          <h1>All Products Inventory</h1>
+          <h2>All Products Inventory</h2>
+          {productDetails.length > 0 && (
+            <s-text>
+              Total Products: {productDetails.length}
+            </s-text>
+          )}
         </div>
 
         {error && (
@@ -121,98 +159,134 @@ export default function Index() {
         )}
 
         {!loading && fetcher.state !== "loading" && productDetails.length > 0 && (
-          <div style={{ marginTop: '20px' }}>
-            <h2 style={{ marginBottom: '20px' }}>
-              Total Products: {productDetails.length}
-            </h2>
+          <s-stack gap="base" direction="block">
+            {productDetails.map((product: any) => {
+              const isOpen = openProducts[product.id] || false;
+              const totalInventory = getTotalInventory(product);
+              const productImage = getProductImage(product);
+              const productImageAlt = getProductImageAlt(product);
 
-            {productDetails.map((product: any) => (
-              <div key={product.id} style={{
-                border: '1px solid #ddd',
-                padding: '20px',
-                marginBottom: '20px',
-                borderRadius: '8px',
-                backgroundColor: 'white',
-                boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-              }}>
-                <h3 style={{ marginBottom: '10px', color: '#333' }}>
-                  Title : {product.title}
-                </h3>
-                <p style={{ color: '#666', fontSize: '14px', marginBottom: '15px' }}>
-                  Product ID: {product.id}
-                </p>
-
-                <div style={{ marginTop: '15px' }}>
-                  <h4 style={{ marginBottom: '10px', color: '#555' }}>
-                    Variants ({product.variants.nodes.length})
-                  </h4>
-
-                  {product.variants.nodes.map((variant: any) => (
-                    <div key={variant.id} style={{
-                      marginLeft: '0',
-                      marginTop: '10px',
-                      padding: '15px',
-                      backgroundColor: '#f9fafb',
-                      borderRadius: '5px',
-                      borderLeft: '3px solid #5c6ac4'
-                    }}>
+              return (
+                <s-section key={product.id}>
+                  <s-stack gap="base" direction="block">
+                    <s-clickable
+                      border="base"
+                      padding="base"
+                      background="subdued"
+                      borderRadius="base"
+                      onClick={() => toggleProduct(product.id)}
+                    >
                       <div style={{
-                        display: 'grid',
-                        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                        gap: '10px',
-                        marginBottom: '10px'
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center"
                       }}>
-                        <p>
-                          <strong>Variant:</strong> {variant.title}
-                        </p>
-                        <p>
-                          <strong>SKU:</strong> {variant.sku || 'N/A'}
-                        </p>
-                        <p>
-                          <strong>Total Inventory:</strong> {variant.inventoryQuantity}
-                        </p>
-                      </div>
-
-                      {variant.inventoryItem.inventoryLevels.nodes.length > 0 && (
-                        <div style={{ marginTop: '15px' }}>
-                          <strong style={{ display: 'block', marginBottom: '8px' }}>
-                            Location Inventory:
-                          </strong>
-                          <ul style={{
-                            listStyle: 'none',
-                            padding: 0,
-                            margin: 0
-                          }}>
-                            {variant.inventoryItem.inventoryLevels.nodes.map((level: any, idx: number) => (
-                              <li key={idx} style={{
-                                padding: '8px 12px',
-                                backgroundColor: 'white',
-                                marginBottom: '5px',
-                                borderRadius: '3px',
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                alignItems: 'center'
-                              }}>
-                                <span style={{ fontWeight: '500' }}>
-                                  {level.location.name}
-                                </span>
-                                <span style={{
-                                  color: level.quantities[0]?.quantity > 0 ? '#16a34a' : '#dc2626',
-                                  fontWeight: 'bold'
-                                }}>
-                                  {level.quantities[0]?.quantity || 0} available
-                                </span>
-                              </li>
-                            ))}
-                          </ul>
+                        <div style={{display: "flex", alignItems: "center", gap: "10px"}}>
+                          {productImage ? (
+                            <s-thumbnail
+                              alt={productImageAlt}
+                              src={productImage }
+                              size="small"
+                            />
+                          ) : (
+                            <s-thumbnail
+                              alt={productImageAlt}
+                              src="https://cdn.shopify.com/s/files/1/0781/9391/7986/files/Main_b13ad453-477c-4ed1-9b43-81f3345adfd6.jpg?v=1738404310"
+                              size="small"
+                            />
+                          )}
+                          <s-text>{product.title}</s-text>
                         </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
+                        
+                        <s-text>
+                          <div style={{ color: totalInventory > 0 ? '#16a34a' : '#dc2626' }}>
+                            Total Inventory: {totalInventory}
+                          </div>
+                        </s-text>
+                      </div>
+                    </s-clickable>
+
+                    {isOpen && (
+                      <s-box padding="base" background="subdued" borderRadius="base">
+                        <s-stack gap="base" direction="block">
+                          <div>
+                            <s-text>
+                              <div style={{ marginBottom: "10px" }}>
+                                Variants ({product.variants.nodes.length})
+                              </div>
+                            </s-text>
+                            <s-stack gap="base" direction="block">
+                              {product.variants.nodes.map((variant: any) => (
+                                <s-box
+                                  key={variant.id}
+                                  padding="base"
+                                  borderRadius="base"
+                                  border="base"
+                                >
+                                  <s-stack gap="base" direction="block">
+                                    <div style={{
+                                      display: 'flex',
+                                      justifyContent: 'space-between',
+                                      gap: '10px'
+                                    }}>
+                                      <div>
+                                        <s-text>Variant: {variant.title}</s-text>
+                                      </div>
+                                      <div>
+                                        <s-text>SKU: {variant.sku || 'N/A'}</s-text>
+                                      </div>
+                                      <div>
+                                        <s-text>Total Inventory: {variant.inventoryQuantity}</s-text>
+                                      </div>
+                                    </div>
+
+                                    {variant.inventoryItem.inventoryLevels.nodes.length > 0 && (
+                                      <div style={{ marginTop: '5px' }}>
+                                        <div style={{ marginBottom: "10px" }}>
+                                          Location Inventory:
+                                        </div>
+                                        <s-stack direction="block" gap="small">
+                                          {variant.inventoryItem.inventoryLevels.nodes.map((level: any, idx: number) => (
+                                            <div
+                                              key={idx}
+                                              style={{
+                                                padding: '8px 12px',
+                                                backgroundColor: 'white',
+                                                borderRadius: '5px',
+                                                display: 'flex',
+                                                justifyContent: 'space-between',
+                                                alignItems: 'center',
+                                                border: '1px solid #e5e7eb'
+                                              }}
+                                            >
+                                              <s-text>
+                                                {level.location.name}
+                                              </s-text>
+                                              <div
+                                                style={{
+                                                  color: level.quantities[0]?.quantity > 0 ? '#16a34a' : '#dc2626'
+                                                }}
+                                              >
+                                                {level.quantities[0]?.quantity || 0} available
+                                              </div>
+                                            </div>
+                                          ))}
+                                        </s-stack>
+                                      </div>
+                                    )}
+                                  </s-stack>
+                                </s-box>
+                              ))}
+                            </s-stack>
+                          </div>
+                        </s-stack>
+                      </s-box>
+                    )}
+                  </s-stack>
+                </s-section>
+              );
+            })}
+          </s-stack>
         )}
 
         {!loading && fetcher.state !== "loading" && productDetails.length === 0 && !error && (
@@ -221,7 +295,7 @@ export default function Index() {
             padding: '60px 20px',
             color: '#666'
           }}>
-            <p style={{ fontSize: '18px' }}>No products found.</p>
+            <s-text>No products found.</s-text>
           </div>
         )}
       </s-section>
