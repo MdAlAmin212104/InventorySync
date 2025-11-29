@@ -11,10 +11,10 @@ import { useEffect, useState } from "react";
 
 export const loader = async ({ request }: LoaderFunctionArgs) => {
   const { admin, session } = await authenticate.admin(request);
-  
+
   const response = await admin.graphql(`
     query GetProducts {
-      products(first: 50) {
+      products(first: 50,  sortKey: CREATED_AT, reverse: true) {
         nodes {
           id
           title
@@ -45,8 +45,8 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
   `);
 
   const data = await response.json();
-  
-  return({
+
+  return ({
     shop: session.shop,
     products: data.data?.products?.nodes || [],
   });
@@ -63,7 +63,7 @@ export default function Index() {
   const { products } = useLoaderData<typeof loader>();
   const [productDetails, setProductDetails] = useState<any[]>(products);
   const [loading, setLoading] = useState(false);
-  const [error, ] = useState<string | null>(null);
+  const [error,] = useState<string | null>(null);
   const fetcher = useFetcher();
 
 
@@ -77,7 +77,22 @@ export default function Index() {
 
   return (
     <s-page heading="Shopify Product Inventory">
-      <div style={{padding: '20px', maxWidth: '1200px', margin: '0 auto'}}>
+      <s-section>
+        <h1 className="text-2xl font-bold text-blue-600">Hello Shopify + Tailwind!</h1>
+      <button className="mt-4 px-4 py-2 bg-black text-white rounded-lg">
+        Click Me
+      </button>
+      <div className="shadow-xl p-4 bg-white rounded-xl">
+  <p className="text-lg font-semibold text-gray-700">Dashboard</p>
+</div>
+
+        <s-box padding="base">Available for iPad, iPhone, and Android.</s-box>
+
+        <s-box padding="base" background="subdued" border="base" borderRadius="base">
+          Available for iPad, iPhone, and Android.
+        </s-box>
+      </s-section>
+      <s-section>
         <div style={{
           display: 'flex',
           justifyContent: 'space-between',
@@ -100,17 +115,17 @@ export default function Index() {
         )}
 
         {(loading || fetcher.state === "loading") && (
-          <div style={{textAlign: 'center', padding: '40px'}}>
+          <div style={{ textAlign: 'center', padding: '40px' }}>
             <p>Loading products...</p>
           </div>
         )}
-        
+
         {!loading && fetcher.state !== "loading" && productDetails.length > 0 && (
-          <div style={{marginTop: '20px'}}>
-            <h2 style={{marginBottom: '20px'}}>
+          <div style={{ marginTop: '20px' }}>
+            <h2 style={{ marginBottom: '20px' }}>
               Total Products: {productDetails.length}
             </h2>
-            
+
             {productDetails.map((product: any) => (
               <div key={product.id} style={{
                 border: '1px solid #ddd',
@@ -120,18 +135,18 @@ export default function Index() {
                 backgroundColor: 'white',
                 boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
               }}>
-                <h3 style={{marginBottom: '10px', color: '#333'}}>
-                  {product.title}
+                <h3 style={{ marginBottom: '10px', color: '#333' }}>
+                  Title : {product.title}
                 </h3>
-                <p style={{color: '#666', fontSize: '14px', marginBottom: '15px'}}>
+                <p style={{ color: '#666', fontSize: '14px', marginBottom: '15px' }}>
                   Product ID: {product.id}
                 </p>
-                
-                <div style={{marginTop: '15px'}}>
-                  <h4 style={{marginBottom: '10px', color: '#555'}}>
+
+                <div style={{ marginTop: '15px' }}>
+                  <h4 style={{ marginBottom: '10px', color: '#555' }}>
                     Variants ({product.variants.nodes.length})
                   </h4>
-                  
+
                   {product.variants.nodes.map((variant: any) => (
                     <div key={variant.id} style={{
                       marginLeft: '0',
@@ -157,10 +172,10 @@ export default function Index() {
                           <strong>Total Inventory:</strong> {variant.inventoryQuantity}
                         </p>
                       </div>
-                      
+
                       {variant.inventoryItem.inventoryLevels.nodes.length > 0 && (
-                        <div style={{marginTop: '15px'}}>
-                          <strong style={{display: 'block', marginBottom: '8px'}}>
+                        <div style={{ marginTop: '15px' }}>
+                          <strong style={{ display: 'block', marginBottom: '8px' }}>
                             Location Inventory:
                           </strong>
                           <ul style={{
@@ -178,7 +193,7 @@ export default function Index() {
                                 justifyContent: 'space-between',
                                 alignItems: 'center'
                               }}>
-                                <span style={{fontWeight: '500'}}>
+                                <span style={{ fontWeight: '500' }}>
                                   {level.location.name}
                                 </span>
                                 <span style={{
@@ -206,10 +221,10 @@ export default function Index() {
             padding: '60px 20px',
             color: '#666'
           }}>
-            <p style={{fontSize: '18px'}}>No products found.</p>
+            <p style={{ fontSize: '18px' }}>No products found.</p>
           </div>
         )}
-      </div>
+      </s-section>
     </s-page>
   );
 }

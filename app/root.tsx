@@ -1,5 +1,5 @@
 import { Links, Meta, Outlet, Scripts, ScrollRestoration } from "react-router";
-
+import "./styles/tailwind.css";
 export default function App() {
   return (
     <html lang="en">
