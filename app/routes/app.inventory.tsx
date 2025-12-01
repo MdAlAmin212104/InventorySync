@@ -37,9 +37,7 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
               inventoryItem {
                 inventoryLevels(first: 20) {
                   nodes {
-                    location {
-                      name
-                    }
+                    location { name }
                     quantities(names: ["available"]) {
                       name
                       quantity
@@ -63,112 +61,74 @@ export const loader = async ({ request }: LoaderFunctionArgs) => {
 };
 
 export const action = async ({ request }: ActionFunctionArgs) => {
-  const { admin, session } = await authenticate.admin(request);
-  console.log(admin, session);
+  await authenticate.admin(request);
   return null;
 };
 
 export default function Index() {
   const { products } = useLoaderData<typeof loader>();
   const [productDetails, setProductDetails] = useState<any[]>(products);
-  const [loading, setLoading] = useState(false);
-  const [error] = useState<string | null>(null);
-  const [openProducts, setOpenProducts] = useState<{ [key: string]: boolean }>({});
+  const [openProducts, setOpenProducts] = useState<{ [id: string]: boolean }>({});
+  const [currentPage, setCurrentPage] = useState(1);
   const fetcher = useFetcher();
 
+  const ITEMS_PER_PAGE = 10;
+  const totalPages = Math.ceil(productDetails.length / ITEMS_PER_PAGE);
+
+  const currentProducts = productDetails.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
+
+  /** Update product details when fetcher returns fresh data */
   useEffect(() => {
     if (fetcher.data?.products) {
       setProductDetails(fetcher.data.products);
-      setLoading(false);
     }
   }, [fetcher.data]);
 
-  useEffect(() => {
-    const style = document.createElement('style');
-    style.innerHTML = `
-      s-clickable:hover,
-      s-clickable:hover::part(base) {
-        background-color: transparent !important;
-        background: transparent !important;
-      }
-    `;
-    document.head.appendChild(style);
-
-    return () => {
-      document.head.removeChild(style);
-    };
-  }, []);
-
+  /** Toggle open/close product details */
   const toggleProduct = useCallback((productId: string) => {
-    setOpenProducts((prev) => ({
+    setOpenProducts(prev => ({
       ...prev,
       [productId]: !prev[productId],
     }));
   }, []);
 
-  // Calculate total inventory for a product
-  const getTotalInventory = (product: any) => {
-    return product.variants.nodes.reduce((total: number, variant: any) => {
-      return total + (variant.inventoryQuantity || 0);
-    }, 0);
-  };
+  /** Helper: product inventory total */
+  const getTotalInventory = (p: any) =>
+    p.variants.nodes.reduce((sum: number, v: any) => sum + (v.inventoryQuantity || 0), 0);
 
-  // Get product image URL safely
-  const getProductImage = (product: any) => {
-    return product?.media?.nodes?.[0]?.preview?.image?.url || null;
-  };
+  /** Helper: product image */
+  const getImage = (p: any) =>
+    p?.media?.nodes?.[0]?.preview?.image?.url ||
+    "https://cdn.shopify.com/s/files/1/0781/9391/7986/files/Main_b13ad453-477c-4ed1-9b43-81f3345adfd6.jpg?v=1738404310";
 
-  // Get product image alt text safely
-  const getProductImageAlt = (product: any) => {
-    return product?.media?.nodes?.[0]?.preview?.image?.altText || product.title;
-  };
+  const getAlt = (p: any) =>
+    p?.media?.nodes?.[0]?.preview?.image?.altText || p.title;
 
   return (
     <s-page heading="Shopify Product Inventory">
       <s-section>
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginBottom: '20px'
-        }}>
+
+        {/* Header */}
+        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 20 }}>
           <h2>All Products Inventory</h2>
-          {productDetails.length > 0 && (
-            <s-text>
-              Total Products: {productDetails.length}
-            </s-text>
-          )}
+          <s-text>Total Products: {productDetails.length}</s-text>
         </div>
 
-        {error && (
-          <div style={{
-            padding: '15px',
-            backgroundColor: '#fee',
-            color: '#c00',
-            borderRadius: '5px',
-            marginBottom: '20px'
-          }}>
-            Error: {error}
-          </div>
-        )}
-
-        {(loading || fetcher.state === "loading") && (
-          <div style={{ textAlign: 'center', padding: '40px' }}>
-            <p>Loading products...</p>
-          </div>
-        )}
-
-        {!loading && fetcher.state !== "loading" && productDetails.length > 0 && (
+        {/* Product List */}
+        {currentProducts.length > 0 ? (
           <s-stack gap="base" direction="block">
-            {productDetails.map((product: any) => {
+            {currentProducts.map((product: any) => {
               const isOpen = openProducts[product.id] || false;
               const totalInventory = getTotalInventory(product);
-              const productImage = getProductImage(product);
-              const productImageAlt = getProductImageAlt(product);
 
               return (
                 <s-section key={product.id}>
                   <s-stack gap="base" direction="block">
+
+                    {/* Product Header Row */}
                     <s-clickable
                       border="base"
                       padding="base"
@@ -181,128 +141,120 @@ export default function Index() {
                         justifyContent: "space-between",
                         alignItems: "center"
                       }}>
-                        <div style={{display: "flex", alignItems: "center", gap: "10px"}}>
-                          {productImage ? (
-                            <s-thumbnail
-                              alt={productImageAlt}
-                              src={productImage }
-                              size="small"
-                            />
-                          ) : (
-                            <s-thumbnail
-                              alt={productImageAlt}
-                              src="https://cdn.shopify.com/s/files/1/0781/9391/7986/files/Main_b13ad453-477c-4ed1-9b43-81f3345adfd6.jpg?v=1738404310"
-                              size="small"
-                            />
-                          )}
+                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                          <s-thumbnail alt={getAlt(product)} src={getImage(product)} size="small" />
                           <s-text>{product.title}</s-text>
                         </div>
-                        
-                        <s-text>
-                          <div style={{ color: totalInventory > 0 ? '#16a34a' : '#dc2626' }}>
-                            Total Inventory: {totalInventory}
-                          </div>
-                        </s-text>
+
+                        <div style={{ color: totalInventory > 0 ? "#16a34a" : "#dc2626" }}>
+                          Total Inventory: {totalInventory}
+                        </div>
                       </div>
                     </s-clickable>
 
+                    {/* Dropdown Details */}
                     {isOpen && (
                       <s-box padding="base" background="subdued" borderRadius="base">
-                        <s-stack gap="base" direction="block">
-                          <div>
-                            <s-text>
-                              <div style={{ marginBottom: "10px" }}>
-                                Variants ({product.variants.nodes.length})
-                              </div>
-                            </s-text>
-                            <s-stack gap="base" direction="block">
-                              {product.variants.nodes.map((variant: any) => (
-                                <s-box
-                                  key={variant.id}
-                                  padding="base"
-                                  borderRadius="base"
-                                  border="base"
-                                >
-                                  <s-stack gap="base" direction="block">
-                                    <div style={{
-                                      display: 'flex',
-                                      justifyContent: 'space-between',
-                                      gap: '10px'
-                                    }}>
-                                      <div>
-                                        <s-text>Variant: {variant.title}</s-text>
-                                      </div>
-                                      <div>
-                                        <s-text>SKU: {variant.sku || 'N/A'}</s-text>
-                                      </div>
-                                      <div>
-                                        <s-text>Total Inventory: {variant.inventoryQuantity}</s-text>
-                                      </div>
-                                    </div>
+                        <s-stack gap="base">
 
-                                    {variant.inventoryItem.inventoryLevels.nodes.length > 0 && (
-                                      <div style={{ marginTop: '5px' }}>
-                                        <div style={{ marginBottom: "10px" }}>
-                                          Location Inventory:
+                          <s-text>Variants ({product.variants.nodes.length})</s-text>
+
+                          {product.variants.nodes.map((variant: any) => (
+                            <s-box key={variant.id} padding="base" border="base" borderRadius="base">
+                              <s-stack gap="base">
+
+                                <div style={{
+                                  display: "flex",
+                                  justifyContent: "space-between",
+                                  gap: 10,
+                                }}>
+                                  <s-text>Variant: {variant.title}</s-text>
+                                  <s-text>SKU: {variant.sku || "N/A"}</s-text>
+                                  <s-text>Inventory: {variant.inventoryQuantity}</s-text>
+                                </div>
+
+                                {variant.inventoryItem.inventoryLevels.nodes.length > 0 && (
+                                  <div>
+                                    <s-text>Location Inventory</s-text>
+                                    <s-stack direction="block" gap="small">
+                                      {variant.inventoryItem.inventoryLevels.nodes.map((level: any, i: number) => (
+                                        <div key={i} style={{
+                                          padding: "8px 12px",
+                                          background: "white",
+                                          borderRadius: 5,
+                                          border: "1px solid #e5e7eb",
+                                          display: "flex",
+                                          justifyContent: "space-between",
+                                        }}>
+                                          <s-text>{level.location.name}</s-text>
+                                          <span style={{
+                                            color: level.quantities[0]?.quantity > 0 ? "#16a34a" : "#dc2626"
+                                          }}>
+                                            {level.quantities[0]?.quantity || 0} available
+                                          </span>
                                         </div>
-                                        <s-stack direction="block" gap="small">
-                                          {variant.inventoryItem.inventoryLevels.nodes.map((level: any, idx: number) => (
-                                            <div
-                                              key={idx}
-                                              style={{
-                                                padding: '8px 12px',
-                                                backgroundColor: 'white',
-                                                borderRadius: '5px',
-                                                display: 'flex',
-                                                justifyContent: 'space-between',
-                                                alignItems: 'center',
-                                                border: '1px solid #e5e7eb'
-                                              }}
-                                            >
-                                              <s-text>
-                                                {level.location.name}
-                                              </s-text>
-                                              <div
-                                                style={{
-                                                  color: level.quantities[0]?.quantity > 0 ? '#16a34a' : '#dc2626'
-                                                }}
-                                              >
-                                                {level.quantities[0]?.quantity || 0} available
-                                              </div>
-                                            </div>
-                                          ))}
-                                        </s-stack>
-                                      </div>
-                                    )}
-                                  </s-stack>
-                                </s-box>
-                              ))}
-                            </s-stack>
-                          </div>
+                                      ))}
+                                    </s-stack>
+                                  </div>
+                                )}
+
+                              </s-stack>
+                            </s-box>
+                          ))}
+
                         </s-stack>
                       </s-box>
                     )}
+
                   </s-stack>
                 </s-section>
               );
             })}
-          </s-stack>
-        )}
 
-        {!loading && fetcher.state !== "loading" && productDetails.length === 0 && !error && (
-          <div style={{
-            textAlign: 'center',
-            padding: '60px 20px',
-            color: '#666'
-          }}>
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div style={{
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+                gap: 12,
+                marginTop: 20,
+              }}>
+                <s-button
+                  variant="secondary"
+                  tone="neutral"
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage(prev => prev - 1)}
+                >
+                  Previous
+                </s-button>
+
+                <s-badge tone="info">
+                  Page {currentPage} of {totalPages}
+                </s-badge>
+
+                <s-button
+                  variant="secondary"
+                  tone="neutral"
+                  disabled={currentPage === totalPages}
+                  onClick={() => setCurrentPage(prev => prev + 1)}
+                >
+                  Next
+                </s-button>
+              </div>
+            )}
+
+          </s-stack>
+        ) : (
+          <div style={{ textAlign: "center", padding: "60px 20px", color: "#666" }}>
             <s-text>No products found.</s-text>
           </div>
         )}
+
       </s-section>
     </s-page>
   );
 }
 
-export const headers: HeadersFunction = (headersArgs) => {
-  return boundary.headers(headersArgs);
-};
+export const headers: HeadersFunction = (headersArgs) =>
+  boundary.headers(headersArgs);
